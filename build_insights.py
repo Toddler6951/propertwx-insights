@@ -212,10 +212,12 @@ def build(src_dir, out_dir):
                     sd['top_wind'].append(rec)
         print(f'  {state}: {sum(state_data[state]["totals"].values())} events')
 
-    # Sort top events and trim to top 25
-    top_hail.sort(reverse=True); top_hail = top_hail[:25]
-    top_tornadoes.sort(reverse=True); top_tornadoes = top_tornadoes[:25]
-    top_wind.sort(reverse=True); top_wind = top_wind[:25]
+    # Sort top events and trim to top 25.
+    # Sort key is just the leading magnitude/rank — sorting whole tuples breaks
+    # when later fields (cz_name, lat, lon) contain None.
+    top_hail.sort(key=lambda r: r[0], reverse=True); top_hail = top_hail[:25]
+    top_tornadoes.sort(key=lambda r: r[0], reverse=True); top_tornadoes = top_tornadoes[:25]
+    top_wind.sort(key=lambda r: r[0], reverse=True); top_wind = top_wind[:25]
 
     # Year trend: linear slope (events per year over time, by category)
     sorted_years = sorted(top_by_year.keys())
@@ -279,9 +281,9 @@ def build(src_dir, out_dir):
         sd = state_data[state]
         if not sum(sd['totals'].values()):
             continue
-        sd['top_hail'].sort(reverse=True); sd['top_hail'] = sd['top_hail'][:15]
-        sd['top_tornadoes'].sort(reverse=True); sd['top_tornadoes'] = sd['top_tornadoes'][:15]
-        sd['top_wind'].sort(reverse=True); sd['top_wind'] = sd['top_wind'][:15]
+        sd['top_hail'].sort(key=lambda r: r[0], reverse=True); sd['top_hail'] = sd['top_hail'][:15]
+        sd['top_tornadoes'].sort(key=lambda r: r[0], reverse=True); sd['top_tornadoes'] = sd['top_tornadoes'][:15]
+        sd['top_wind'].sort(key=lambda r: r[0], reverse=True); sd['top_wind'] = sd['top_wind'][:15]
         state_yrs = sorted(sd['by_year'].keys())
         out_state = {
             'state': state,
