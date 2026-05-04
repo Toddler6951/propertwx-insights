@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Storm Events Insights · PropertyWX</title>
+<meta name="description" content="Open-data analytics from the NOAA Storm Events Database — hail, wind, tornado, and flood events by year, state, and month, computed from the official NCEI archive.">
+<!-- ===== Google Analytics 4 =====
+     Replace G-XXXXXXXXXX with your GA4 Measurement ID. -->
+<script>window.GA_MEASUREMENT_ID = "G-M4EWDXLBH9";</script>
+<script>
+  (function(){
+    var id = window.GA_MEASUREMENT_ID;
+    if (!/^G-[A-Z0-9]{4,}$/.test(id) || id === "G-XXXXXXXXXX") return;
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function(){ dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', id, { anonymize_ip: true });
+  })();
+</script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+  :root {
+    --primary: #1f4e78; --primary-light: #2e6da4; --accent: #e67e22;
+    --bg: #f5f7fa; --surface: #ffffff; --border: #d8dee9;
+    --text: #2c3e50; --muted: #6c757d;
+    --hail: #3498db; --wind: #9b59b6; --tornado: #c0392b;
+    --flood: #1abc9c; --lightning: #f1c40f; --winter: #7f8c8d;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg);font-size:15px;line-height:1.6;}
+  header{background:var(--primary);color:#fff;padding:24px 28px;}
+  header h1{margin:0 0 4px;font-size:26px;font-weight:600;}
+  header .sub{font-size:14px;opacity:.85;}
+  header a{color:#fff;text-decoration:underline;}
+  main{max-width:1100px;margin:0 auto;padding:28px;}
+  section{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:24px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  section h2{margin:0 0 12px;color:var(--primary);font-size:20px;font-weight:600;border-bottom:2px solid var(--primary);padding-bottom:6px;}
+  section h3{margin:20px 0 8px;color:var(--primary);font-size:16px;font-weight:600;}
+  section p{margin:8px 0;}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0;}
+  .stat{background:#eaf3fb;border-radius:6px;padding:14px;text-align:center;}
+  .stat .num{font-size:28px;font-weight:700;color:var(--primary);line-height:1.1;}
+  .stat .lbl{font-size:12px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.4px;}
+  .chart{height:340px;margin:14px 0;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;}
+  th{background:var(--primary);color:#fff;padding:8px 10px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px;}
+  td{padding:7px 10px;border-bottom:1px solid #eef0f4;}
+  tr:hover td{background:#f5f9fc;}
+  .source{font-size:12px;color:var(--muted);font-style:italic;margin-top:8px;}
+  footer{text-align:center;padding:20px;color:var(--muted);font-size:12px;border-top:1px solid var(--border);}
+  .cta{background:var(--accent);color:#fff;padding:12px 18px;border-radius:6px;display:inline-block;text-decoration:none;font-weight:600;margin-top:8px;}
+  .cta:hover{background:#d35400;}
+  .nav-list{list-style:none;padding:0;margin:14px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;}
+  .nav-list a{display:block;padding:8px 12px;background:#eaf3fb;border-radius:5px;color:var(--primary);text-decoration:none;font-size:13px;}
+  .nav-list a:hover{background:var(--primary);color:#fff;}
+  .loading{text-align:center;padding:40px;color:var(--muted);font-style:italic;}
+  .meta{font-size:12px;color:var(--muted);}
+</style>
+</head>
+<body>
+<header>
+  <h1>Storm Events Insights</h1>
+  <div class="sub">Open analytics from the NOAA Storm Events Database, refreshed monthly · Tools at <a href="https://propertywx.com">propertywx.com</a></div>
+</header>
+
+<main>
+  <section>
+    <h2>What this is</h2>
+    <p>This site computes summary analytics from the public NOAA NCEI Storm Events Database — hail, wind, tornado, flood, and other significant weather events recorded across the United States since 1996. The data is the same archive used by insurance researchers, but presented as open, browsable summaries rather than per-property reports.</p>
+    <p>If you're researching a specific property, use the live tool at <a href="https://propertywx.com">propertywx.com</a>. This site is for understanding regional climatology and trends.</p>
+    <div class="meta" id="generated-at">Loading…</div>
+  </section>
+
+  <section id="overview">
+    <h2>Overview — All States</h2>
+    <div id="overview-stats" class="stat-grid"><div class="loading">Loading insights…</div></div>
+    <h3>Events by year and category</h3>
+    <div id="chart-year-cat" class="chart"></div>
+    <h3>Monthly seasonality</h3>
+    <div id="chart-month" class="chart"></div>
+    <p class="source">Data: NOAA NCEI Storm Events Database · Source: <a href="https://www.ncei.noaa.gov/stormevents/" target="_blank" rel="noopener">ncei.noaa.gov/stormevents/</a></p>
+  </section>
+
+  <section>
+    <h2>State Rankings</h2>
+    <h3>Most active states — last 10 years</h3>
+    <div id="chart-state-recent" class="chart"></div>
+    <h3>State pages</h3>
+    <p class="meta">Per-state climatology and historical event lists.</p>
+    <ul id="state-nav" class="nav-list"></ul>
+  </section>
+
+  <section>
+    <h2>Largest hail events on record</h2>
+    <table id="top-hail">
+      <thead><tr><th>Date</th><th>State</th><th>County</th><th>Hail (in)</th></tr></thead>
+      <tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+    </table>
+    <p class="source">All-time top 25, by reported hail diameter.</p>
+  </section>
+
+  <section>
+    <h2>About</h2>
+    <p>The data is processed by an open-source script that runs monthly via GitHub Actions. The full dataset is available at <a href="https://github.com/Toddler6951/storm-claim-tool/tree/main/sed-data">the storm-claim-tool repository</a>.</p>
+    <p>For property-specific research — radius searches, claim attribution, exportable reports — visit the live tool at <a href="https://propertywx.com">propertywx.com</a>.</p>
+    <a href="https://propertywx.com" class="cta">Research a property →</a>
+  </section>
+</main>
+
+<footer>
+  Storm Events Insights · A research project from PropertyWX · Data: NOAA NCEI Storm Events Database (public domain) · Last updated <span id="footer-updated">—</span>
+</footer>
+
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>
+const STATE_NAMES = {
+  AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',
+  DC:'District of Columbia',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',
+  KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',
+  MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',
+  NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',PR:'Puerto Rico',
+  RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',
+  WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming'
+};
+const CATEGORY_COLORS = {
+  Hail:'#3498db', Wind:'#9b59b6', Tornado:'#c0392b',
+  Flood:'#1abc9c', Lightning:'#f1c40f', Winter:'#7f8c8d', Other:'#95a5a6'
+};
+
+async function load(){
+  const r = await fetch('data/insights.json', { cache: 'no-cache' });
+  if (!r.ok) {
+    document.getElementById('overview-stats').innerHTML = '<div class="loading">Insights data not yet generated. Run build_insights.py.</div>';
+    return;
+  }
+  const d = await r.json();
+  renderOverview(d);
+  renderYearCat(d);
+  renderMonth(d);
+  renderStateRanking(d);
+  renderStateNav(d);
+  renderTopHail(d);
+}
+
+function renderOverview(d){
+  document.getElementById('generated-at').textContent =
+    `Last updated: ${new Date(d.generated_at).toLocaleDateString()} · Data span: ${d.years_covered[0]}–${d.years_covered[1]} (${d.years_count} years)`;
+  document.getElementById('footer-updated').textContent =
+    new Date(d.generated_at).toLocaleDateString();
+  const stats = d.category_totals;
+  const html = [
+    `<div class="stat"><div class="num">${d.total_events.toLocaleString()}</div><div class="lbl">Total events</div></div>`,
+    ...Object.entries(stats).slice(0, 5).map(([k, v]) =>
+      `<div class="stat"><div class="num">${v.toLocaleString()}</div><div class="lbl">${k}</div></div>`)
+  ].join('');
+  document.getElementById('overview-stats').innerHTML = html;
+}
+
+function renderYearCat(d){
+  const cats = ['Hail','Wind','Tornado','Flood','Lightning','Winter','Other'];
+  const years = d.by_year.map(y => y.year);
+  const traces = cats.map(c => ({
+    type:'bar', name:c,
+    x: years, y: d.by_year.map(y => y.by_cat[c] || 0),
+    marker: { color: CATEGORY_COLORS[c] || '#888' },
+    hovertemplate: '<b>%{x}</b><br>'+c+': %{y}<extra></extra>'
+  }));
+  Plotly.newPlot('chart-year-cat', traces, {
+    barmode: 'stack',
+    margin: { t: 20, l: 50, r: 30, b: 50 },
+    xaxis: { title: 'Year' },
+    yaxis: { title: 'Events' },
+    legend: { orientation: 'h', y: -0.2 },
+  }, { responsive: true, displayModeBar: false });
+}
+
+function renderMonth(d){
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  Plotly.newPlot('chart-month', [{
+    type: 'bar',
+    x: monthNames,
+    y: d.by_month.map(m => m.count),
+    marker: { color: '#1f4e78' },
+    hovertemplate: '<b>%{x}</b><br>%{y} events<extra></extra>',
+  }], {
+    margin: { t: 20, l: 50, r: 30, b: 50 },
+    xaxis: { title: 'Month' },
+    yaxis: { title: 'Events (all years)' },
+  }, { responsive: true, displayModeBar: false });
+}
+
+function renderStateRanking(d){
+  const r = d.state_rankings.recent_10y;
+  Plotly.newPlot('chart-state-recent', [{
+    type: 'bar', orientation: 'h',
+    y: r.map(x => `${x.state} — ${STATE_NAMES[x.state] || ''}`).reverse(),
+    x: r.map(x => x.count).reverse(),
+    marker: { color: '#1f4e78' },
+    hovertemplate: '<b>%{y}</b><br>%{x} events<extra></extra>',
+  }], {
+    margin: { t: 20, l: 200, r: 30, b: 50 },
+    xaxis: { title: 'Events (last 10 years)' },
+    height: Math.max(280, 28 * r.length + 60),
+  }, { responsive: true, displayModeBar: false });
+}
+
+function renderStateNav(d){
+  const states = d.state_rankings.all_years.map(x => x.state);
+  // Add ALL states in alphabetical order, not just top
+  const allStates = Object.keys(STATE_NAMES).sort();
+  const html = allStates.map(s =>
+    `<a href="state.html?s=${s}">${s} — ${STATE_NAMES[s]}</a>`
+  ).join('');
+  document.getElementById('state-nav').innerHTML = html;
+}
+
+function renderTopHail(d){
+  const tbody = document.querySelector('#top-hail tbody');
+  if (!d.top_hail_events || !d.top_hail_events.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="loading">No data.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = d.top_hail_events.map(e => `
+    <tr>
+      <td>${e.date.slice(0, 10)}</td>
+      <td>${e.state}</td>
+      <td>${e.county}</td>
+      <td><b>${e.magnitude_in.toFixed(2)}″</b></td>
+    </tr>
+  `).join('');
+}
+
+load().catch(err => {
+  console.error(err);
+  document.getElementById('overview-stats').innerHTML =
+    `<div class="loading">Error loading insights: ${err.message}</div>`;
+});
+</script>
+</body>
+</html>

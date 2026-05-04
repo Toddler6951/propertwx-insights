@@ -1,0 +1,61 @@
+name: Refresh insights data
+
+on:
+  schedule:
+    - cron: '30 7 1 * *'   # 07:30 UTC on the 1st of each month (after SED refresh in main repo at 06:00)
+  push:
+    paths:
+      - 'build_insights.py'
+      - '.github/workflows/refresh-insights.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-insights
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+        with:
+          path: insights
+
+      - name: Checkout storm-claim-tool (for SED data)
+        uses: actions/checkout@v4
+        with:
+          repository: Toddler6951/storm-claim-tool
+          path: storm-data
+          # Only need sed-data folder; sparse checkout speeds this up.
+          sparse-checkout: |
+            sed-data
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run build_insights.py
+        run: |
+          cd insights
+          python build_insights.py --src ../storm-data/sed-data --out data
+
+      - name: Commit and push if changed
+        run: |
+          cd insights
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data
+          if git diff --cached --quiet; then
+            echo "::notice::No insights changes."
+          else
+            git commit -m "Refresh insights ($(date -u +'%Y-%m-%d'))"
+            git push
+            echo "::notice::Insights data updated."
+          fi
